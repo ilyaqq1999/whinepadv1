@@ -28,9 +28,7 @@ const Form = forwardRef(({fiedls, initialData = {}, readonly = false}, ref) => {
                 }
                 return (
                     <div className="FormRow" key={id}>
-                        <label className="FormLabel" htmlFor={id}>
-                            {label}
-                        </label>
+                        <label className="FormLabel" htmlFor={id}>{label}</label>
                         <FormInput
                             id={id}
                             type={type}

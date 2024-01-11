@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import './App.css';
 import Excel from "./components/Excel";
 import Discovery from "./components/Discovery";

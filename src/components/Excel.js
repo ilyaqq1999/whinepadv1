@@ -5,8 +5,9 @@ import clone from '../modules/clone'
 import './Excel.css';
 import classNames from "classnames";
 import Actions from "./Actions";
-
-let originalData = null;
+import Rating from "./Rating";
+import Dialog from "./Dialog";
+import Form from "./Form";
 
 function reducer(data, action) {
     if (action.type === 'sort') {
@@ -25,27 +26,23 @@ function reducer(data, action) {
         });
     }
     if (action.type === 'save') {
-        data[action.payload.edit.row][action.payload.edit.column] =
-            action.payload.value;
+        const {int, edit} = action.payload
+        data[edit.row][edit.column] = int
+        ? parseInt(action.payload.value, 10)
+        : action.payload.value
         return data;
     }
-    if (action.type === 'startSearching') {
-        originalData = data;
-        return originalData;
+    if (action.type === 'delete') {
+        data = clone(data)
+        data.splice(action.payload.rowidx, 1)
     }
-    if (action.type === 'doneSearching') {
-        return originalData;
+    if (action.type === 'saveForm') {
+        Array.from(action.payload.form.current).forEach((input) =>
+            (data[action.payload.rowidx][input.id] = input.value))
     }
-    if (action.type === 'search') {
-        return originalData.filter((row) => {
-            return (
-                row[action.payload.column]
-                    .toString()
-                    .toLowerCase()
-                    .indexOf(action.payload.needle.toLowerCase()) > -1
-            );
-        });
-    }
+
+    setTimeout(() => action.payload.onDataChange(data))
+    return data
 }
 
 function Excel({schema, initialData, onDataChange, filter}) {
@@ -69,57 +66,86 @@ function Excel({schema, initialData, onDataChange, filter}) {
     }
 
     function showEditor(e) {
+        const config = e.target.dataset.schema
+        if (!config || config === 'rating') return
         setEdit({
             row: parseInt(e.target.parentNode.dataset.row, 10),
-            column: e.target.cellIndex,
+            column: config,
         });
     }
 
     function save(e) {
         e.preventDefault();
         const value = e.target.firstChild.value;
+        const valueType = schema[e.target.parentNode.dataset.schema].type
         dispatch({
             type: 'save',
             payload: {
                 edit,
                 value,
+                onDataChange,
+                int: valueType === 'year' || valueType === 'rating'
             },
         });
         setEdit(null);
     }
 
-    function toggleSearch() {
-        if (!search) {
-            dispatch({
-                type: 'startSearching',
-            });
-        } else {
-            dispatch({
-                type: 'doneSearching',
-            });
+    function handleAction(rowidx, type) {
+        if (type === 'delete') {
+            setDialog(
+                <Dialog
+                    modal
+                    header="Confirm deletion"
+                    confirmLabel="Delete"
+                    onAction={(action) => {
+                        setDialog(null)
+                        if (action === 'confirm') {
+                            dispatch({
+                                type: 'delete',
+                                payload: {
+                                    rowidx,
+                                    onDataChange
+                                }
+                            })
+                        }
+                    }}>
+                    {`Реально хочешь удалить "${data[rowidx].name}"`}
+                </Dialog>
+            )
         }
-        setSearch(!search);
+        const isEdit = type === 'edit';
+        if (type === 'info' || isEdit) {
+            const formPrefill = data[rowidx]
+            setDialog(
+                <Dialog
+                    modal
+                    extendedDismiss={!isEdit}
+                    header={isEdit ? 'Edit item': 'Item details'}
+                    confirmLabel={isEdit ? 'Save': 'ok'}
+                    hasCancel={isEdit}
+                    onAction={(action) => {
+                        setDialog(null)
+                        if (isEdit && action === 'confirm') {
+                            dispatch({
+                                type: 'saveForm',
+                                payload: {
+                                    rowidx,
+                                    onDataChange,
+                                    form,
+                                }
+                            })
+                        }
+                    }}>
+                    <Form
+                        ref={form}
+                        fiedls={schema}
+                        initialData={formPrefill}
+                        readonly={!isEdit}
+                    />
+                </Dialog>
+            )
+        }
     }
-
-    function filter(e) {
-        const needle = e.target.value;
-        const column = e.target.dataset.idx;
-        dispatch({
-            type: 'search',
-            payload: {needle, column},
-        });
-        setEdit(null);
-    }
-
-    const searchRow = !search ? null : (
-        <tr onChange={filter}>
-            {headers.map((_, idx) => (
-                <td key={idx}>
-                    <input type="text" data-idx={idx}/>
-                </td>
-            ))}
-        </tr>
-    );
 
     return (
         <div className="Excel">
@@ -143,38 +169,65 @@ function Excel({schema, initialData, onDataChange, filter}) {
                 </thead>
                 <tbody onDoubleClick={showEditor}>
                 {data.map((row, rowidx) => {
-                        //todo
-                        return (
-                            <tr key={rowidx} data-row={rowidx}>
-                                {Object.keys(row).map((cell, columnidx) => {
-                                    const config = schema[cell]
-                                    let content = row[cell]
-                                    //todo
+                    if (filter) {
+                        const needle = filter.toLowerCase()
+                        let match = false
+                        const fileds= Object.keys(schema)
+                        for (let f = 0; f < fileds.length; f++) {
+                            if (row[fileds[f]].toString().toLowerCase().includes(needle)) match = true
+                        }
+                        if (!match) return null
+                    }
+                    return (
+                        <tr key={rowidx} data-row={rowidx}>
+                            {Object.keys(row).map((cell, columnidx) => {
+                                const config = schema[cell]
+                                if (!config.show) {
+                                    return null
+                                }
+                                let content = row[cell]
 
-                                    return (
-                                        <td
-                                            key={columnidx}
-                                            data-schema={cell}
-                                            className={classNames({
-                                                [`schema-${cell}`]: true,
-                                                ExcelEditTable: config.type !== 'rating',
-                                                ExcelDataLeft: config.align !== 'left',
-                                                ExcelDataRight: config.align !== 'right',
-                                                ExcelDataCenter:
-                                                    config.align !== 'right'
-                                                    &&
-                                                    config.align !== 'left',
-                                            })}>
-                                            {content}
-                                        </td>
+                                if (edit && edit.row === rowidx && edit.column === cell) {
+                                    content = (
+                                        <form onSubmit={save}>
+                                            <input type="text" defaultValue={content}/>
+                                        </form>
                                     )
-                                })}
-                                <td>
-                                    <Actions onAction={handleAction.bind(null, rowidx)}/>
-                                </td>
-                            </tr>
-                        )
-                    })}
+                                } else if (config.type === 'rating') {
+                                    content = (
+                                        <Rating
+                                            id={cell}
+                                            readonly
+                                            key={content}
+                                            defaultValue={Number(content)}
+                                        />
+                                    )
+                                }
+
+                                return (
+                                    <td
+                                        key={columnidx}
+                                        data-schema={cell}
+                                        className={classNames({
+                                            [`schema-${cell}`]: true,
+                                            ExcelEditTable: config.type !== 'rating',
+                                            ExcelDataLeft: config.align !== 'left',
+                                            ExcelDataRight: config.align !== 'right',
+                                            ExcelDataCenter:
+                                                config.align !== 'right'
+                                                &&
+                                                config.align !== 'left',
+                                        })}>
+                                        {content}
+                                    </td>
+                                )
+                            })}
+                            <td>
+                                <Actions onAction={handleAction.bind(null, rowidx)}/>
+                            </td>
+                        </tr>
+                    )
+                })}
                 </tbody>
             </table>
             {dialog}

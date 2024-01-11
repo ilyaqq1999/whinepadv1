@@ -1,6 +1,5 @@
 import Excel from "./Excel";
 import Logo from "./Logo";
-import Header from "./Header";
 import Body from "./Body";
 import Button from './Button';
 import Suggest from "./Suggest";
