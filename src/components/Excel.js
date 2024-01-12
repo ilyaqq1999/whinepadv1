@@ -9,9 +9,9 @@ import Rating from "./Rating";
 import Dialog from "./Dialog";
 import Form from "./Form";
 
-function reducer(data, action) {
-    if (action.type === 'sort') {
-        const {column, descending} = action.payload;
+function dataMangler(data, action, payload) {
+    if (action === 'sort') {
+        const {column, descending} = payload;
         return clone(data).sort((a, b) => {
             if (a[column] === b[column]) {
                 return 0;
@@ -25,28 +25,26 @@ function reducer(data, action) {
                     : -1;
         });
     }
-    if (action.type === 'save') {
-        const {int, edit} = action.payload
+    if (action === 'save') {
+        const {int, edit} = payload
         data[edit.row][edit.column] = int
-        ? parseInt(action.payload.value, 10)
-        : action.payload.value
+        ? parseInt(payload.value, 10)
+        : payload.value
         return data;
     }
-    if (action.type === 'delete') {
+    if (action === 'delete') {
         data = clone(data)
-        data.splice(action.payload.rowidx, 1)
+        data.splice(payload.rowidx, 1)
     }
-    if (action.type === 'saveForm') {
-        Array.from(action.payload.form.current).forEach((input) =>
-            (data[action.payload.rowidx][input.id] = input.value))
+    if (action === 'saveForm') {
+        Array.from(payload.form.current).forEach((input) =>
+            (data[payload.rowidx][input.id] = input.value))
     }
-
-    setTimeout(() => action.payload.onDataChange(data))
     return data
 }
 
 function Excel({schema, initialData, onDataChange, filter}) {
-    const [data, dispatch] = useReducer(reducer, initialData);
+    const [data, dispatch] = useReducer(dataMangler, initialData);
     const [sorting, setSorting] = useState({
         column: '',
         descending: false,
@@ -62,7 +60,7 @@ function Excel({schema, initialData, onDataChange, filter}) {
         }
         const descending = sorting.column === column && !sorting.descending;
         setSorting({column, descending});
-        dispatch({type: 'sort', payload: {column, descending}});
+        dispatch({type: 'sort', payload: {column, descending}});//todo тут остановился
     }
 
     function showEditor(e) {

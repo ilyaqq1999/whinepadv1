@@ -5,91 +5,51 @@ import Header from "./Header";
 import Body from "./Body";
 import Dialog from "./Dialog";
 import Excel from "./Excel";
-import Form from "./Form";
 import clone from "../modules/clone";
+import DataContext from "../contexts/DataContext";
+import RouteContext from "../contexts/RouteContext";
+import Form from "./Form";
+import schema from "../config/schema";
+
+let initialData = JSON.parse(localStorage.getItem('data'))
+
+if (!initialData) {
+    initialData = [{}]
+    Object.keys(schema).forEach(
+        (key) => (initialData[0][key] = schema[key].samples[0])
+    )
+}
 
 function commitToStorage(data) {
     localStorage.setItem('data', JSON.stringify(data))
 }
 
-function reducer(data, action) {
-    if (action.type === 'save') {
-        data = clone(data)
-        data.unshift(action.payload.formData)
-        commitToStorage(data)
-        return data
-    }
-    if (action.type === 'excelchange') {
-        commitToStorage(action.payload.updatedData)
-        return action.payload.updatedData
-    }
-}
-
-function DataFlow({schema, initialData}) {
-    const [data, dispatch] = useReducer(reducer,initialData)
-    const [addNew, setAddNew] = useState(false)
-    const [filter, setFilter] = useState(null)
-
-    const form = useRef(null)
-
-    function saveNew(action) {
-        setAddNew(false)
-        if (action === 'dismiss') return
-
-        const formData = {}
-        Array.from(form.current).forEach(
-            (input) => (formData[input.id] = input.value)
-        )
-
-        dispatch({
-            type: 'save',
-            payload: {formData}
-        })
-    }
-
-    function onExcelDataChange(updatedData) {
-        dispatch({
-            type: 'excelchange',
-            payload: {updatedData}
-        })
-    }
+function DataFlow() {
+    const [data, setData] = useState(initialData)
+    // const [addNew, setAddNew] = useState(false)
+    const [filter, setFilter] = useState(route.filter)
 
     function onSearch(e) {
-        setFilter(e.target.value)
+        const s = e.target.value
+        setFilter(s)
+    }
+
+    function updateData(newData) {
+        newData = clone(newData)
+        commitToStorage(newData)
+        setData(newData)
     }
 
     return (
         <div className="DataFlow">
-            <Header
-                onAdd={() => setAddNew(true)}
-                onSearch={onSearch}
-                count = {data.length}
-            />
+        <DataContext.Provider value={{data, updateData}}>
+            <Header onSearch={onSearch}/>
             <Body>
-                <Excel
-                    schema={schema}
-                    initialData={data}
-                    key={data}
-                    onDataChange={(updatedData) => onExcelDataChange(updatedData)}
-                    filter={filter}
-                />
-                {addNew ? (
-                    <Dialog
-                        header="Add new item"
-                        modal={true}
-                        confirmLabel="Add"
-                        onAction={(action) => saveNew(action)}>
-                        <Form ref={form} fiedls={schema}/>
-                    </Dialog>
-                ): null }
+                <Excel filter={filter}/>
             </Body>
+        </DataContext.Provider>
         </div>
     )
-}
-
-DataFlow.propTypes = {
-    schema: PropTypes.object.isRequired,
-    initialData: PropTypes.arrayOf(PropTypes.object).isRequired
 }
 
 export default DataFlow
