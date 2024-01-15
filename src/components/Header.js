@@ -9,16 +9,17 @@ import Form from "./Form";
 import schema from "../config/schema";
 
 import DataContext from "../contexts/DataContext";
+import RouteContext from "../contexts/RouteContext";
 
 
 function Header({onSearch}) {
     const {data, updateData} = useContext(DataContext)
-    const count = data.length
-
-    const {addNew, setAddNew} = useState(false)
+    const {route, updateRoute} = useContext(RouteContext)
+    const [addNew, setAddNew] = useState(false)
 
     const form = useRef(null)
 
+    const count = data.length
     const placeholder = count > 1 ? `Search ${count} items` : 'Search'
 
     function saveNew(action) {
@@ -34,8 +35,9 @@ function Header({onSearch}) {
     }
 
 
-    function onAdd(action) {
+    function onAdd() {
         setAddNew(true)
+        updateRoute('add')
     }
 
     return (
@@ -43,7 +45,11 @@ function Header({onSearch}) {
             <div className='Header'>
                 <Logo/>
                 <div>
-                    <FormInput placeholder={placeholder} id="search" onChange={onSearch} defaultValue={route.filter}/>
+                    <FormInput placeholder={placeholder}
+                               id="search"
+                               onChange={onSearch}
+                               defaultValue={route.filter}
+                    />
                 </div>
                 <div>
                     <Button onClick={onAdd}>

@@ -1,14 +1,11 @@
-import {useState, useReducer, useRef} from "react";
-import PropTypes from "prop-types";
+import {useState} from "react";
 
 import Header from "./Header";
 import Body from "./Body";
-import Dialog from "./Dialog";
 import Excel from "./Excel";
 import clone from "../modules/clone";
 import DataContext from "../contexts/DataContext";
 import RouteContext from "../contexts/RouteContext";
-import Form from "./Form";
 import schema from "../config/schema";
 
 let initialData = JSON.parse(localStorage.getItem('data'))
@@ -24,6 +21,26 @@ function commitToStorage(data) {
     localStorage.setItem('data', JSON.stringify(data))
 }
 
+const route = {}
+
+function resetRoute() {
+    route.add = false
+    route.edit = null
+    route.info = null
+    route.filter = null
+}
+
+resetRoute();
+const path = window.location.pathname.replace(/\//, '')
+
+if (path) {
+    const [action, id] = path.split('/')
+    if (action === 'add') route.add = true
+    else if (action === 'edit' && id !== undefined) route.edit = parseInt(id, 10)
+    else if (action === 'info' && id !== undefined) route.info = parseInt(id, 10)
+    else if (action === 'filter' && id !== undefined) route.filter = parseInt(id, 10)
+}
+
 function DataFlow() {
     const [data, setData] = useState(initialData)
     // const [addNew, setAddNew] = useState(false)
@@ -32,6 +49,8 @@ function DataFlow() {
     function onSearch(e) {
         const s = e.target.value
         setFilter(s)
+        if (s) updateRoute('filter', s)
+        else updateRoute()
     }
 
     function updateData(newData) {
@@ -40,14 +59,23 @@ function DataFlow() {
         setData(newData)
     }
 
+    function updateRoute(action = '', id = '') {
+        resetRoute()
+        if (action) route[action] = action === 'add' ? true : id
+        id = id !== '' ? '/' + id : ''
+        window.history.replaceState(null, null, `/${action}${id}`)
+    }
+
     return (
         <div className="DataFlow">
-        <DataContext.Provider value={{data, updateData}}>
-            <Header onSearch={onSearch}/>
-            <Body>
-                <Excel filter={filter}/>
-            </Body>
-        </DataContext.Provider>
+            <DataContext.Provider value={{data, updateData}}>
+                <RouteContext.Provider value={{route, updateRoute}}>
+                    <Header onSearch={onSearch}/>
+                    <Body>
+                        <Excel filter={filter}/>
+                    </Body>
+                </RouteContext.Provider>
+            </DataContext.Provider>
         </div>
     )
 }

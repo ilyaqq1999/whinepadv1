@@ -1,6 +1,5 @@
-import React from 'react';
+import React, {useCallback, useContext, useEffect, useState, useRef} from 'react';
 import PropTypes from "prop-types";
-import {useReducer, useState, useRef} from "react";
 import clone from '../modules/clone'
 import './Excel.css';
 import classNames from "classnames";
@@ -8,6 +7,9 @@ import Actions from "./Actions";
 import Rating from "./Rating";
 import Dialog from "./Dialog";
 import Form from "./Form";
+import RouteContext from "../contexts/RouteContext";
+import DataContext from "../contexts/DataContext";
+import schema from "../config/schema";
 
 function dataMangler(data, action, payload) {
     if (action === 'sort') {
@@ -43,8 +45,9 @@ function dataMangler(data, action, payload) {
     return data
 }
 
-function Excel({schema, initialData, onDataChange, filter}) {
-    const [data, dispatch] = useReducer(dataMangler, initialData);
+function Excel({filter}) {
+    const {data, updateData} = useContext(DataContext);
+    const {route, updateRoute} = useContext(RouteContext)
     const [sorting, setSorting] = useState({
         column: '',
         descending: false,
@@ -60,7 +63,7 @@ function Excel({schema, initialData, onDataChange, filter}) {
         }
         const descending = sorting.column === column && !sorting.descending;
         setSorting({column, descending});
-        dispatch({type: 'sort', payload: {column, descending}});//todo тут остановился
+        updateData(dataMangler(data,'sort',{column, descending}))
     }
 
     function showEditor(e) {
@@ -74,76 +77,75 @@ function Excel({schema, initialData, onDataChange, filter}) {
 
     function save(e) {
         e.preventDefault();
+        setEdit(null)
         const value = e.target.firstChild.value;
         const valueType = schema[e.target.parentNode.dataset.schema].type
-        dispatch({
-            type: 'save',
-            payload: {
-                edit,
-                value,
-                onDataChange,
-                int: valueType === 'year' || valueType === 'rating'
-            },
-        });
-        setEdit(null);
+        updateData(dataMangler(data,'save',{
+            edit,
+            value,
+            updateData,
+            int: valueType === 'year' || valueType === 'rating'
+        }))
     }
 
-    function handleAction(rowidx, type) {
-        if (type === 'delete') {
-            setDialog(
-                <Dialog
-                    modal
-                    header="Confirm deletion"
-                    confirmLabel="Delete"
-                    onAction={(action) => {
-                        setDialog(null)
-                        if (action === 'confirm') {
-                            dispatch({
-                                type: 'delete',
-                                payload: {
+    const handleAction = useCallback((rowidx, type) => {
+            if (type === 'delete') {
+                setDialog(
+                    <Dialog
+                        modal
+                        header="Confirm deletion"
+                        confirmLabel="Delete"
+                        onAction={(action) => {
+                            setDialog(null)
+                            if (action === 'confirm') {
+                                updateData(dataMangler(data, 'delete', {
                                     rowidx,
-                                    onDataChange
-                                }
-                            })
-                        }
-                    }}>
-                    {`Реально хочешь удалить "${data[rowidx].name}"`}
-                </Dialog>
-            )
-        }
-        const isEdit = type === 'edit';
-        if (type === 'info' || isEdit) {
-            const formPrefill = data[rowidx]
-            setDialog(
-                <Dialog
-                    modal
-                    extendedDismiss={!isEdit}
-                    header={isEdit ? 'Edit item': 'Item details'}
-                    confirmLabel={isEdit ? 'Save': 'ok'}
-                    hasCancel={isEdit}
-                    onAction={(action) => {
-                        setDialog(null)
-                        if (isEdit && action === 'confirm') {
-                            dispatch({
-                                type: 'saveForm',
-                                payload: {
+                                    updateData
+                                }))
+                            }
+                        }}>
+                        {`Реально хочешь удалить "${data[rowidx].name}"`}
+                    </Dialog>
+                )
+            }
+            const isEdit = type === 'edit';
+            if (type === 'info' || isEdit) {
+                const formPrefill = data[rowidx]
+                updateRoute(type, rowidx)
+                setDialog(
+                    <Dialog
+                        modal
+                        extendedDismiss={!isEdit}
+                        header={isEdit ? 'Edit item' : 'Item details'}
+                        confirmLabel={isEdit ? 'Save' : 'ok'}
+                        hasCancel={isEdit}
+                        onAction={(action) => {
+                            setDialog(null)
+                            updateRoute()
+                            if (isEdit && action === 'confirm') {
+                                updateData(dataMangler(data, 'saveForm'), {
                                     rowidx,
-                                    onDataChange,
+                                    updateData,
                                     form,
-                                }
-                            })
-                        }
-                    }}>
-                    <Form
-                        ref={form}
-                        fiedls={schema}
-                        initialData={formPrefill}
-                        readonly={!isEdit}
-                    />
-                </Dialog>
-            )
-        }
-    }
+                                })
+                            }
+                        }}>
+                        <Form
+                            ref={form}
+                            fiedls={schema}
+                            initialData={formPrefill}
+                            readonly={!isEdit}
+                        />
+                    </Dialog>
+                )
+            }
+        }, [data, updateData, updateRoute]
+    )
+
+    useEffect(() => {
+        if (route.edit !== null && route.edit < data.length) handleAction(route.edit, 'edit')
+        else if (route.info !== null && route.info < data.length) handleAction(route.info, 'info')
+    }, [route, handleAction, data])
 
     return (
         <div className="Excel">

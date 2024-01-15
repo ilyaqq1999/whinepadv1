@@ -10,6 +10,8 @@ import {useState} from "react";
 import Dialog from "./Dialog";
 
 import schema from "../config/schema";
+import DataContext from "../contexts/DataContext";
+import Header from "./Header";
 
 function DialogExample() {
     const [example, setExample] = useState(null);
@@ -46,6 +48,26 @@ function DialogExample() {
         </>
     );
 }
+
+function ExcelExample() {
+    const initialData = schema.name.samples.map((_, idx) => {
+        const element = {}
+        for (let key in schema) {
+            element[key] = schema[key].samples[idx]
+        }
+        return element
+    })
+    const [data, setData] = useState(initialData)
+    function updateData(newData) {
+        setData(newData)
+    }
+    return (
+        <DataContext.Provider value={{data, updateData}}>
+            <Excel/>
+        </DataContext.Provider>
+    )
+}
+
 
 function Discovery() {
     return (
@@ -127,19 +149,13 @@ function Discovery() {
             <DialogExample/>
 
             <h2>Excel</h2>
-            <Excel
-            schema={schema}
-            initialData={schema.name.samples.map((_, idx) => {
-                const element = {}
-                for (let key in schema) {
-                    element[key] = schema[key].samples[idx]
-                }
-                return element
-            })}
-            onDataChange={(data) => {
-                console.log(data)
-            }}
-            />
+            <ExcelExample/>
+
+            <h2>Header</h2>
+            <DataContext.Provider value={{data: [1,2,3],
+            updateData: () => {}}}>
+                <Header onSearch={(e) => console.log(e)}/>
+            </DataContext.Provider>
         </div>
     )
 }
