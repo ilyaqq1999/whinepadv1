@@ -38,7 +38,7 @@ if (path) {
     if (action === 'add') route.add = true
     else if (action === 'edit' && id !== undefined) route.edit = parseInt(id, 10)
     else if (action === 'info' && id !== undefined) route.info = parseInt(id, 10)
-    else if (action === 'filter' && id !== undefined) route.filter = parseInt(id, 10)
+    else if (action === 'filter' && id !== undefined) route.filter = id
 }
 
 function DataFlow() {
